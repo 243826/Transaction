@@ -1,6 +1,7 @@
 package com.celeral.transaction.processor;
 
 import java.io.File;
+import java.util.UUID;
 
 import com.celeral.transaction.ExecutionContext;
 import com.celeral.transaction.Payload;
@@ -26,7 +27,7 @@ public class SerialTransactionProcessor implements TransactionProcessor
     }
   }
 
-  private void initExecutionContext(final Transaction transaction)
+  protected void initExecutionContext(final Transaction transaction)
   {
     if (this.transaction != null) {
       this.transaction.end(context);
@@ -35,9 +36,9 @@ public class SerialTransactionProcessor implements TransactionProcessor
     context = new ExecutionContext()
     {
       @Override
-      public long getTenantId()
+      public UUID getTenantId()
       {
-        return 0;
+        return UUID.randomUUID();
       }
 
       @Override
