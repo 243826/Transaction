@@ -12,6 +12,7 @@ import org.apache.commons.lang3.SystemUtils;
 
 public class SerialTransactionProcessor implements TransactionProcessor
 {
+  private static final UUID TENANT_ID = UUID.randomUUID();
   private ExecutionContext context;
   private Transaction transaction;
 
@@ -21,9 +22,7 @@ public class SerialTransactionProcessor implements TransactionProcessor
     initExecutionContext(transaction);
     if (transaction.begin(context)) {
       transaction.end(context);
-    }
-    else {
-      this.transaction = transaction;
+      this.transaction = null;
     }
   }
 
@@ -33,12 +32,13 @@ public class SerialTransactionProcessor implements TransactionProcessor
       this.transaction.end(context);
     }
 
+    this.transaction = transaction;
     context = new ExecutionContext()
     {
       @Override
       public UUID getTenantId()
       {
-        return UUID.randomUUID();
+        return TENANT_ID;
       }
 
       @Override
