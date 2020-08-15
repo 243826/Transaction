@@ -9,15 +9,16 @@ import java.io.RandomAccessFile;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.esotericsoftware.kryo.serializers.FieldSerializer;
+import com.esotericsoftware.kryo.serializers.JavaSerializer;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.celeral.transaction.ExecutionContext;
 import com.celeral.transaction.Payload;
 import com.celeral.transaction.Transaction;
 import com.celeral.utils.Throwables;
-import com.esotericsoftware.kryo.serializers.FieldSerializer;
-import com.esotericsoftware.kryo.serializers.JavaSerializer;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static com.celeral.utils.Throwables.throwFormatted;
 
@@ -233,5 +234,5 @@ public class UploadTransaction implements Transaction
       '}';
   }
 
-  private static final Logger logger = LoggerFactory.getLogger(UploadTransaction.class);
+  private static final Logger logger = LogManager.getLogger();
 }
