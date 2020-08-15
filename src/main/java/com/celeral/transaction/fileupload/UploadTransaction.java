@@ -234,5 +234,5 @@ public class UploadTransaction implements Transaction
       '}';
   }
 
-  private static final Logger logger = LogManager.getLogger();
+  private static final Logger logger = LogManager.getLogger(UploadTransaction.class);
 }
