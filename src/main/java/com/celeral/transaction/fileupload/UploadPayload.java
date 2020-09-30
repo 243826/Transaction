@@ -1,69 +1,63 @@
+/*
+ * Copyright © 2020 Celeral.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.celeral.transaction.fileupload;
 
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.util.zip.Adler32;
 
-import com.celeral.transaction.ExecutionContext;
 import com.celeral.transaction.Payload;
-import com.celeral.utils.Throwables;
 
-public class UploadPayload implements Payload<UploadTransaction>
-{
-  byte[] data;
-  long transactionId;
-  int sequenceId;
+public class UploadPayload implements Payload {
+  static final Adler32 checksumComputer = new Adler32();
 
-  private UploadPayload()
-  {
-    /* jlto */
+  static long computeChecksum(byte[] bytes) {
+    checksumComputer.reset();
+    checksumComputer.update(bytes, 0, bytes.length);
+    return checksumComputer.getValue();
   }
 
-  public UploadPayload(long transactionId, int sequenceId, byte[] data)
-  {
+  long offset;
+  byte[] data;
+  long checksum;
+  long transactionId;
+
+  private UploadPayload() {
+    /* for serialization */
+  }
+
+  public UploadPayload(long transactionId, long offset, byte[] data) {
     this.transactionId = transactionId;
-    this.sequenceId = sequenceId;
+    this.offset = offset;
     this.data = data;
+    this.checksum = computeChecksum(data);
   }
 
   @Override
-  public long getTransactionId()
-  {
+  public long getTransactionId() {
     return transactionId;
   }
 
   @Override
-  public int getSequenceId()
-  {
-    return sequenceId;
+  public String toString() {
+    return "UploadPayload{"
+        + "data="
+        + data.length
+        + ", transactionId="
+        + transactionId
+        + ", sequenceId="
+        + offset
+        + '}';
   }
-
-  @Override
-  public String toString()
-  {
-    return "UploadPayload{" +
-      "data=" + data.length +
-      ", transactionId=" + transactionId +
-      ", sequenceId=" + sequenceId +
-      '}';
-  }
-
-  @Override
-  public boolean execute(ExecutionContext context, UploadTransaction transaction)
-  {
-    UploadTransactionData data = transaction.data;
-    RandomAccessFile channel = data.channel;
-    try {
-      channel.seek(transaction.getChunkSize() * sequenceId);
-      channel.write(this.data);
-    }
-    catch (IOException ex) {
-      throw Throwables.throwFormatted(ex,
-                                      RuntimeException.class,
-                                      "Unable to write chunk: {} in file {}!",
-                                      this, data.tempFile);
-    }
-
-    return transaction.getPayloadCount() == ++data.count;
-  }
-
 }
