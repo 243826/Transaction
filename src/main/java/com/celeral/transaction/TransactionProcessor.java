@@ -15,8 +15,9 @@
  */
 package com.celeral.transaction;
 
-public interface TransactionProcessor<R> {
-  R process(Transaction transaction);
+public interface TransactionProcessor {
 
-  R process(Payload payload);
+  Transaction.ReturnValue init(Transaction<?> transaction);
+
+  Transaction.ReturnValue process(long transactionId, Object payload);
 }

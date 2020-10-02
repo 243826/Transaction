@@ -31,7 +31,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.celeral.transaction.ExecutionContext;
-import com.celeral.transaction.Payload;
 import com.celeral.transaction.Transaction;
 import com.celeral.utils.Throwables;
 
@@ -49,6 +48,7 @@ public class UploadTransaction implements Transaction<UploadPayload> {
   private final long mtime;
 
   transient UploadTransactionData data;
+  private ExecutionContext context;
 
   protected UploadTransaction() {
     id = 0;
@@ -90,7 +90,7 @@ public class UploadTransaction implements Transaction<UploadPayload> {
     return new UploadPayloadIterator(DEFAULT_CHUNK_SIZE);
   }
 
-  public class UploadPayloadIterator implements Iterator<Payload>, Closeable {
+  public class UploadPayloadIterator implements Iterator<UploadPayload>, Closeable {
     private final FileInputStream is;
     private final int blockSize;
     long offset;
@@ -115,16 +115,12 @@ public class UploadTransaction implements Transaction<UploadPayload> {
     }
 
     @Override
-    public Payload next() {
+    public UploadPayload next() {
       long nextOffset = offset + blockSize;
       byte[] bytes = new byte[nextOffset < size ? blockSize : (int) (size - offset)];
       try {
         is.read(bytes);
-        @SuppressWarnings("rawtypes")
-        Payload payload = new UploadPayload(UploadTransaction.this.getId(), offset, bytes);
-        @SuppressWarnings("unchecked")
-        Payload retval = payload;
-        return retval;
+        return new UploadPayload(offset, bytes);
       } catch (IOException ex) {
         throw Throwables.throwFormatted(
             ex,
@@ -155,76 +151,40 @@ public class UploadTransaction implements Transaction<UploadPayload> {
   }
 
   @Override
-  public boolean begin(ExecutionContext context) {
-    try {
-      File tempFile = File.createTempFile(path.getName(), null, context.getStorageRoot());
-      RandomAccessFile rw = new RandomAccessFile(tempFile, "rw");
-      data = new UploadTransactionData(tempFile, rw);
-    } catch (IOException ex) {
-      throw throwFormatted(
-          ex,
-          RuntimeException.class,
-          "Unable to create a temporary file for {} in directory {}",
-          path,
-          context.getStorageRoot());
-    }
+  public ReturnValue init(ExecutionContext context) throws IOException {
+    this.context = context;
 
-    return size == 0;
+    File tempFile = File.createTempFile(path.getName(), null, context.getStorageRoot());
+    RandomAccessFile rw = new RandomAccessFile(tempFile, "rw");
+    data = new UploadTransactionData(tempFile, rw);
+
+    return size == 0 ? COMMIT : CONTINUE;
   }
 
   @Override
-  public boolean process(UploadPayload payload) {
+  public ReturnValue process(UploadPayload payload) throws IOException {
     RandomAccessFile channel = data.channel;
-    try {
-      channel.seek(payload.offset);
-      channel.write(payload.data);
-    } catch (IOException ex) {
-      throw Throwables.throwFormatted(
-          ex, RuntimeException.class, "Unable to write chunk: {} in file {}!", this, data.tempFile);
-    }
+    channel.seek(payload.offset);
+    channel.write(payload.data);
 
-    return payload.offset + payload.data.length == size;
+    return payload.offset + payload.data.length == size ? COMMIT : CONTINUE;
   }
 
   @Override
-  public void end(ExecutionContext context) {
-    if (data.count == size) {
-      commit(context);
-    } else {
-      rollback(context);
+  public void abort() throws IOException {
+    logger.debug("Deleting file {}", data.tempFile);
+
+    try (Closeable unused = data.tempFile::delete){
+      data.channel.close();
     }
   }
 
-  public void commit(ExecutionContext context) {
-    try {
-      data.channel.close();
-    } catch (IOException ex) {
-      throw throwFormatted(
-          ex,
-          RuntimeException.class,
-          "Unable to close a temporary file during commit {}!",
-          data.tempFile);
-    }
+  public void commit() throws IOException {
+    data.channel.close();
 
     File dpath = new File(context.getStorageRoot(), path.getName());
     data.tempFile.renameTo(dpath);
     logger.debug("Creating file {}", dpath);
-  }
-
-  public void rollback(ExecutionContext context) {
-    logger.debug("Deleting file {}", data.tempFile);
-
-    try {
-      data.channel.close();
-    } catch (IOException ex) {
-      throw throwFormatted(
-          ex,
-          RuntimeException.class,
-          "Unable to close a temporary file during rollback {}!",
-          data.tempFile);
-    } finally {
-      data.tempFile.delete();
-    }
   }
 
   @Override

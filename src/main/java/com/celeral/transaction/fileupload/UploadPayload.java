@@ -17,9 +17,7 @@ package com.celeral.transaction.fileupload;
 
 import java.util.zip.Adler32;
 
-import com.celeral.transaction.Payload;
-
-public class UploadPayload implements Payload {
+public class UploadPayload {
   static final Adler32 checksumComputer = new Adler32();
 
   static long computeChecksum(byte[] bytes) {
@@ -31,33 +29,19 @@ public class UploadPayload implements Payload {
   long offset;
   byte[] data;
   long checksum;
-  long transactionId;
 
   private UploadPayload() {
     /* for serialization */
   }
 
-  public UploadPayload(long transactionId, long offset, byte[] data) {
-    this.transactionId = transactionId;
+  public UploadPayload(long offset, byte[] data) {
     this.offset = offset;
     this.data = data;
     this.checksum = computeChecksum(data);
   }
 
   @Override
-  public long getTransactionId() {
-    return transactionId;
-  }
-
-  @Override
   public String toString() {
-    return "UploadPayload{"
-        + "data="
-        + data.length
-        + ", transactionId="
-        + transactionId
-        + ", sequenceId="
-        + offset
-        + '}';
+    return "UploadPayload{" + "data=" + data.length + ", sequenceId=" + offset + '}';
   }
 }

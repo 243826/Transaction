@@ -15,12 +15,45 @@
  */
 package com.celeral.transaction;
 
-public interface Transaction<T extends Payload> {
+public interface Transaction<T> {
+  enum Result {
+    CONTINUE,
+    COMMIT,
+    ABORT
+  }
+
+  interface ReturnValue {
+    Result getResult();
+  }
+
+  static class MinimalistReturnValue implements ReturnValue {
+    private final Result result;
+
+    MinimalistReturnValue() {
+      result = null;
+    }
+
+    MinimalistReturnValue(Result result) {
+      this.result = result;
+    }
+
+    @Override
+    public Result getResult() {
+      return result;
+    }
+  }
+
+  ReturnValue CONTINUE = new MinimalistReturnValue(Result.CONTINUE);
+  ReturnValue COMMIT = new MinimalistReturnValue(Result.COMMIT);
+  ReturnValue ABORT = new MinimalistReturnValue(Result.ABORT);
+
   long getId();
 
-  boolean begin(ExecutionContext context);
+  ReturnValue init(ExecutionContext context) throws Exception;
 
-  boolean process(T payload);
+  ReturnValue process(T payload) throws Exception;
 
-  void end(ExecutionContext context);
+  void commit() throws Exception;
+
+  void abort() throws Exception;
 }

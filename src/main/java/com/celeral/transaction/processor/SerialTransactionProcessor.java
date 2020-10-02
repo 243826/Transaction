@@ -15,62 +15,28 @@
  */
 package com.celeral.transaction.processor;
 
-import java.io.File;
-import java.util.UUID;
-
-import org.apache.commons.lang3.SystemUtils;
-
-import com.celeral.transaction.ExecutionContext;
-import com.celeral.transaction.Payload;
 import com.celeral.transaction.Transaction;
-import com.celeral.transaction.TransactionProcessor;
 
-public class SerialTransactionProcessor implements TransactionProcessor<Void> {
-  private static final UUID TENANT_ID = UUID.randomUUID();
-  private ExecutionContext context;
-  private Transaction transaction;
+public class SerialTransactionProcessor extends AbstractTransactionProcessor {
+  Transaction<?> currentTransaction;
 
   @Override
-  public Void process(Transaction transaction) {
-    initExecutionContext(transaction);
-    if (transaction.begin(context)) {
-      transaction.end(context);
-      this.transaction = null;
-    }
-
-    return null;
-  }
-
-  protected void initExecutionContext(final Transaction transaction) {
-    /*
-     * close the previous transaction if it was not closed already.
-     */
-    if (this.transaction != null) {
-      this.transaction.end(context);
-    }
-
-    this.transaction = transaction;
-    context =
-        new ExecutionContext() {
-          @Override
-          public UUID getTenantId() {
-            return TENANT_ID;
-          }
-
-          @Override
-          public File getStorageRoot() {
-            return SystemUtils.getJavaIoTmpDir();
-          }
-        };
+  public long store(Transaction<?> transaction) {
+    currentTransaction = transaction;
+    return transaction.getId();
   }
 
   @Override
-  public Void process(Payload payload) {
-    if (transaction.process(payload)) {
-      transaction.end(context);
-      transaction = null;
-    }
+  public Transaction<?> retrieve(long transactionId) {
+    return currentTransaction;
+  }
 
-    return null;
+  @Override
+  public Transaction<?> remove(long transactionId) {
+    try {
+      return currentTransaction;
+    } finally {
+      currentTransaction = null;
+    }
   }
 }
