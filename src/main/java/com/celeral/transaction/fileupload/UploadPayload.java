@@ -20,7 +20,7 @@ import java.util.zip.Adler32;
 public class UploadPayload {
   static final Adler32 checksumComputer = new Adler32();
 
-  static long computeChecksum(byte[] bytes) {
+  static synchronized long computeChecksum(byte[] bytes) {
     checksumComputer.reset();
     checksumComputer.update(bytes, 0, bytes.length);
     return checksumComputer.getValue();

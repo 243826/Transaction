@@ -57,7 +57,7 @@ public class UploadTransaction implements Transaction<UploadPayload> {
     mtime = 0;
   }
 
-  public UploadTransaction(String path, int chunkSize) throws IOException {
+  public UploadTransaction(String path, int chunkSize) {
     this.id = transactionIdGenerator.incrementAndGet();
     this.path = new File(path);
 
