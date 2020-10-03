@@ -17,7 +17,7 @@ package com.celeral.transaction.processor;
 
 import com.celeral.transaction.Transaction;
 
-public class SerialTransactionProcessor extends AbstractTransactionProcessor {
+public abstract class AbstractSerialTransactionProcessor extends AbstractTransactionProcessor {
   Transaction<?> currentTransaction;
 
   @Override

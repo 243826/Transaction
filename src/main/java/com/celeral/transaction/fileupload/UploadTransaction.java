@@ -15,6 +15,8 @@
  */
 package com.celeral.transaction.fileupload;
 
+import static com.celeral.utils.Throwables.throwFormatted;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
@@ -30,11 +32,10 @@ import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.celeral.transaction.ExecutionContext;
-import com.celeral.transaction.Transaction;
 import com.celeral.utils.Throwables;
 
-import static com.celeral.utils.Throwables.throwFormatted;
+import com.celeral.transaction.ExecutionContext;
+import com.celeral.transaction.Transaction;
 
 public class UploadTransaction implements Transaction<UploadPayload> {
   static int DEFAULT_CHUNK_SIZE = 1024 * 1024;
@@ -174,7 +175,7 @@ public class UploadTransaction implements Transaction<UploadPayload> {
   public void abort() throws IOException {
     logger.debug("Deleting file {}", data.tempFile);
 
-    try (Closeable unused = data.tempFile::delete){
+    try (Closeable unused = data.tempFile::delete) {
       data.channel.close();
     }
   }

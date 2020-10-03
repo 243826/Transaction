@@ -15,10 +15,7 @@
  */
 package com.celeral.transaction.processor;
 
-import java.io.File;
 import java.util.UUID;
-
-import org.apache.commons.lang3.SystemUtils;
 
 import com.celeral.utils.Throwables;
 
@@ -39,19 +36,7 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
   public Transaction.ReturnValue init(Transaction<?> transaction) {
     final Transaction.ReturnValue returnValue;
     try {
-      returnValue =
-          transaction.init(
-              new ExecutionContext() {
-                @Override
-                public UUID getTenantId() {
-                  return TENANT_ID;
-                }
-
-                @Override
-                public File getStorageRoot() {
-                  return SystemUtils.getJavaIoTmpDir();
-                }
-              });
+      returnValue = transaction.init(getExecutionContext());
     } catch (Exception ex) {
       try {
         transaction.abort();
@@ -86,6 +71,8 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
 
     return returnValue;
   }
+
+  public abstract ExecutionContext getExecutionContext();
 
   @Override
   public Transaction.ReturnValue process(long transactionId, Object payload) {
