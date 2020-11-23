@@ -15,45 +15,46 @@
  */
 package com.celeral.transaction;
 
-public interface Transaction<T> {
+import java.util.function.Consumer;
+
+public interface Transaction<H, P> {
   enum Result {
     CONTINUE,
     COMMIT,
     ABORT
   }
 
-  interface ReturnValue {
-    Result getResult();
-  }
+  /**
+   * Initializes the transaction by optionally sending the header information.
+   * The header information is used to do pre-checks and sending the response
+   * back which the transaction initiator could analyze to plan out the subsequent
+   * actions related to the transaction.
+   *
+   * @param header  information useful for pre-qualifying the transaction
+   * @return information useful to plan out the subsequent transaction action
+   * @throws Exception exceptions received while pre-qualifying the transaction
+   */
+  Result init(H header, Consumer<Object> details) throws Exception;
 
-  static class MinimalistReturnValue implements ReturnValue {
-    private final Result result;
+  /**
+   * Processes the payloads associated with the transaction. This call could
+   * be made multiple times if there are many payloads associated with a single
+   * transaction
+   * @param payload useful to carry out the transaction
+   * @return status of the payload processing
+   * @throws Exception exceptions received while processing the payload
+   */
+  Result process(P payload, Consumer<Object> details) throws Exception;
 
-    MinimalistReturnValue() {
-      result = null;
-    }
-
-    MinimalistReturnValue(Result result) {
-      this.result = result;
-    }
-
-    @Override
-    public Result getResult() {
-      return result;
-    }
-  }
-
-  ReturnValue CONTINUE = new MinimalistReturnValue(Result.CONTINUE);
-  ReturnValue COMMIT = new MinimalistReturnValue(Result.COMMIT);
-  ReturnValue ABORT = new MinimalistReturnValue(Result.ABORT);
-
-  long getId();
-
-  ReturnValue init(ExecutionContext context) throws Exception;
-
-  ReturnValue process(T payload) throws Exception;
-
+  /**
+   * Commits the transaction
+   * @throws Exception
+   */
   void commit() throws Exception;
 
+  /**
+   * Performs the rollback of the transaction
+   * @throws Exception
+   */
   void abort() throws Exception;
 }

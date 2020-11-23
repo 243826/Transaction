@@ -17,7 +17,110 @@ package com.celeral.transaction;
 
 public interface TransactionProcessor {
 
-  Transaction.ReturnValue init(Transaction<?> transaction);
+  interface ProcessResult {
+    Transaction.Result getResult();
+    Object getDetails();
 
-  Transaction.ReturnValue process(long transactionId, Object payload);
+    ProcessResult ABORTED = new ProcessResult() {
+      @Override public Transaction.Result getResult()
+      {
+        return Transaction.Result.ABORT;
+      }
+
+      @Override public Object getDetails()
+      {
+        return null;
+      }
+    };
+
+    ProcessResult COMMITTED = new ProcessResult() {
+      @Override public Transaction.Result getResult()
+      {
+        return Transaction.Result.COMMIT;
+      }
+
+      @Override public Object getDetails()
+      {
+        return null;
+      }
+    };
+  }
+
+  interface InitializationResult extends ProcessResult {
+    long getTransactionId();
+
+    InitializationResult ABORTED = new InitializationResult() {
+      @Override public long getTransactionId()
+      {
+        return 0;
+      }
+
+      @Override public Transaction.Result getResult()
+      {
+        return Transaction.Result.ABORT;
+      }
+
+      @Override public Object getDetails()
+      {
+        return null;
+      }
+    };
+
+
+    InitializationResult COMMITTED = new InitializationResult() {
+      @Override public long getTransactionId()
+      {
+        return 0;
+      }
+
+      @Override public Transaction.Result getResult()
+      {
+        return Transaction.Result.COMMIT;
+      }
+
+      @Override public Object getDetails()
+      {
+        return null;
+      }
+    };
+  }
+
+
+
+  class ProcessResultImpl implements ProcessResult {
+    private final Transaction.Result result;
+    private final Object details;
+
+    public ProcessResultImpl(Transaction.Result result, Object details) {
+      this.result = result;
+      this.details = details;
+    }
+
+    public Transaction.Result getResult() {
+      return result;
+    }
+
+    public Object getDetails() {
+      return details;
+    }
+  }
+
+  class InitializationResultImpl extends ProcessResultImpl implements InitializationResult {
+    long transactionId;
+    public InitializationResultImpl(long transactionId, Transaction.Result result, Object details)
+    {
+      super(result, details);
+      this.transactionId = transactionId;
+    }
+
+    public long getTransactionId() {
+      return transactionId;
+    }
+
+  }
+
+
+  InitializationResult init(Object header);
+
+  ProcessResult process(long transactionId, Object payload);
 }

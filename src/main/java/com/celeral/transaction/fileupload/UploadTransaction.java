@@ -15,156 +15,45 @@
  */
 package com.celeral.transaction.fileupload;
 
-import static com.celeral.utils.Throwables.throwFormatted;
-
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicLong;
-
-import com.esotericsoftware.kryo.serializers.FieldSerializer;
-import com.esotericsoftware.kryo.serializers.JavaSerializer;
+import java.util.function.Consumer;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import com.celeral.utils.Throwables;
-
-import com.celeral.transaction.ExecutionContext;
 import com.celeral.transaction.Transaction;
 
-public class UploadTransaction implements Transaction<UploadPayload> {
-  static int DEFAULT_CHUNK_SIZE = 1024 * 1024;
-  private static final AtomicLong transactionIdGenerator = new AtomicLong();
-  private final long id;
+import static com.celeral.transaction.Transaction.Result.COMMIT;
+import static com.celeral.transaction.Transaction.Result.CONTINUE;
 
-  @FieldSerializer.Bind(JavaSerializer.class)
-  private final File path;
+public class UploadTransaction implements Transaction<UploadTransactionHeader, UploadPayload> {
 
-  private final long size;
-  private final long mtime;
+  private final File root;
+  private RandomAccessFile channel;
+  private File tempFile;
+  private long size;
+  private String path;
 
-  transient UploadTransactionData data;
-  private ExecutionContext context;
-
-  protected UploadTransaction() {
-    id = 0;
-    path = null;
-    size = 0;
-    mtime = 0;
-  }
-
-  public UploadTransaction(String path, int chunkSize) {
-    this.id = transactionIdGenerator.incrementAndGet();
-    this.path = new File(path);
-
-    if (this.path.exists()) {
-      if (this.path.isFile()) {
-        if (this.path.canRead()) {
-          this.size = this.path.length();
-          this.mtime = this.path.lastModified();
-        } else {
-          throw throwFormatted(
-              IllegalArgumentException.class,
-              "Unable to read file {} to create fileupload transaction!",
-              this.path);
-        }
-      } else {
-        throw throwFormatted(
-            IllegalArgumentException.class,
-            "Unable to create fileupload transaction with non-regular file {}!",
-            this.path);
-      }
-    } else {
-      throw throwFormatted(
-          IllegalArgumentException.class,
-          "Unable to create fileupload transaction with non existent file {}!",
-          this.path);
-    }
-  }
-
-  public UploadPayloadIterator getPayloadIterator() {
-    return new UploadPayloadIterator(DEFAULT_CHUNK_SIZE);
-  }
-
-  public class UploadPayloadIterator implements Iterator<UploadPayload>, Closeable {
-    private final FileInputStream is;
-    private final int blockSize;
-    long offset;
-
-    public UploadPayloadIterator(int blockSize) {
-      this.blockSize = blockSize;
-      try {
-        is = new FileInputStream(path);
-      } catch (FileNotFoundException ex) {
-        throw Throwables.throwFormatted(
-            ex,
-            RuntimeException.class,
-            "Unable to open {} for transaction {}",
-            path,
-            UploadTransaction.this.getId());
-      }
-    }
-
-    @Override
-    public boolean hasNext() {
-      return offset < size;
-    }
-
-    @Override
-    public UploadPayload next() {
-      long nextOffset = offset + blockSize;
-      byte[] bytes = new byte[nextOffset < size ? blockSize : (int) (size - offset)];
-      try {
-        is.read(bytes);
-        return new UploadPayload(offset, bytes);
-      } catch (IOException ex) {
-        throw Throwables.throwFormatted(
-            ex,
-            RuntimeException.class,
-            "Unable to read chunk at offset {} for transaction {} from file {}!",
-            offset,
-            UploadTransaction.this.getId(),
-            path);
-      } finally {
-        offset = nextOffset;
-      }
-    }
-
-    @Override
-    public void remove() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void close() throws IOException {
-      is.close();
-    }
+  public UploadTransaction(File root) {
+    this.root = root;
   }
 
   @Override
-  public long getId() {
-    return id;
+  public Result init(UploadTransactionHeader header, Consumer<Object> details) throws IOException {
+    size = header.getSize();
+    path = header.getPath().getName();
+
+    tempFile = File.createTempFile(path, null, root);
+    channel = new RandomAccessFile(tempFile, "rw");
+
+    return header.getSize() == 0 ? COMMIT : CONTINUE;
   }
 
   @Override
-  public ReturnValue init(ExecutionContext context) throws IOException {
-    this.context = context;
-
-    File tempFile = File.createTempFile(path.getName(), null, context.getStorageRoot());
-    RandomAccessFile rw = new RandomAccessFile(tempFile, "rw");
-    data = new UploadTransactionData(tempFile, rw);
-
-    return size == 0 ? COMMIT : CONTINUE;
-  }
-
-  @Override
-  public ReturnValue process(UploadPayload payload) throws IOException {
-    RandomAccessFile channel = data.channel;
+  public Result process(UploadPayload payload, Consumer<Object> details) throws IOException {
     channel.seek(payload.offset);
     channel.write(payload.data);
 
@@ -173,33 +62,19 @@ public class UploadTransaction implements Transaction<UploadPayload> {
 
   @Override
   public void abort() throws IOException {
-    logger.debug("Deleting file {}", data.tempFile);
+    logger.debug("Deleting file {}", tempFile);
 
-    try (Closeable unused = data.tempFile::delete) {
-      data.channel.close();
+    try (Closeable unused = tempFile::delete) {
+      channel.close();
     }
   }
 
   public void commit() throws IOException {
-    data.channel.close();
+    channel.close();
 
-    File dpath = new File(context.getStorageRoot(), path.getName());
-    data.tempFile.renameTo(dpath);
+    File dpath = new File(root, path);
+    tempFile.renameTo(dpath);
     logger.debug("Creating file {}", dpath);
-  }
-
-  @Override
-  public String toString() {
-    return "UploadTransaction{"
-        + "id="
-        + id
-        + ", path="
-        + path
-        + ", size ="
-        + size
-        + ", mtime="
-        + mtime
-        + '}';
   }
 
   private static final Logger logger = LogManager.getLogger(UploadTransaction.class);

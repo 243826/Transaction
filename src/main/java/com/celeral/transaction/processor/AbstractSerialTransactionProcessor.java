@@ -18,21 +18,21 @@ package com.celeral.transaction.processor;
 import com.celeral.transaction.Transaction;
 
 public abstract class AbstractSerialTransactionProcessor extends AbstractTransactionProcessor {
-  Transaction<?> currentTransaction;
+  Transaction<?,?> currentTransaction;
 
   @Override
-  public long store(Transaction<?> transaction) {
+  public long store(Transaction<?,?> transaction) {
     currentTransaction = transaction;
-    return transaction.getId();
+    return getNextTransactionId();
   }
 
   @Override
-  public Transaction<?> retrieve(long transactionId) {
+  public Transaction<?,?> retrieve(long transactionId) {
     return currentTransaction;
   }
 
   @Override
-  public Transaction<?> remove(long transactionId) {
+  public Transaction<?,?> remove(long transactionId) {
     try {
       return currentTransaction;
     } finally {

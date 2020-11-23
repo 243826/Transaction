@@ -15,72 +15,49 @@
  */
 package com.celeral.transaction.processor;
 
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
-import com.celeral.utils.Throwables;
-
-import com.celeral.transaction.ExecutionContext;
 import com.celeral.transaction.Transaction;
 import com.celeral.transaction.TransactionProcessor;
+import com.celeral.utils.Throwables;
 
 public abstract class AbstractTransactionProcessor implements TransactionProcessor {
-  private static final UUID TENANT_ID = UUID.randomUUID();
 
-  public abstract long store(Transaction<?> transaction);
+  AtomicLong TRANSACTION_ID_GENERATOR = new AtomicLong();
 
-  public abstract Transaction<?> retrieve(long transactionId);
+  static class DetailsConsumer implements Consumer<Object> {
+    Object o;
+    boolean set;
 
-  public abstract Transaction<?> remove(long transactionId);
-
-  @Override
-  public Transaction.ReturnValue init(Transaction<?> transaction) {
-    final Transaction.ReturnValue returnValue;
-    try {
-      returnValue = transaction.init(getExecutionContext());
-    } catch (Exception ex) {
-      try {
-        transaction.abort();
-      } catch (Exception ex1) {
-        ex.addSuppressed(ex1);
-      }
-
-      throw Throwables.throwSneaky(ex);
+    @Override public void accept(Object o)
+    {
+      set = true;
+      this.o = o;
     }
-
-    switch (returnValue.getResult()) {
-      case CONTINUE:
-        store(transaction);
-        break;
-
-      case ABORT:
-        try {
-          transaction.abort();
-        } catch (Exception ex) {
-          throw Throwables.throwSneaky(ex);
-        }
-        break;
-
-      case COMMIT:
-        try {
-          transaction.commit();
-        } catch (Exception ex) {
-          throw Throwables.throwSneaky(ex);
-        }
-        break;
-    }
-
-    return returnValue;
   }
 
-  public abstract ExecutionContext getExecutionContext();
+  protected long getNextTransactionId() {
+    return TRANSACTION_ID_GENERATOR.incrementAndGet();
+  }
+
+  public abstract long store(Transaction<?,?> transaction);
+
+  public abstract Transaction<?,?> retrieve(long transactionId);
+
+  public abstract Transaction<?,?> remove(long transactionId);
+
+  public abstract Transaction<?,?> newTransaction();
 
   @Override
-  public Transaction.ReturnValue process(long transactionId, Object payload) {
-    @SuppressWarnings("unchecked")
-    Transaction<Object> transaction = (Transaction<Object>) retrieve(transactionId);
-    final Transaction.ReturnValue returnValue;
+  public InitializationResult init(Object header) {
+    @SuppressWarnings("rawtypes")
+    Transaction transaction = newTransaction();
+
+    final DetailsConsumer details = new DetailsConsumer();
+    final Transaction.Result result;
     try {
-      returnValue = transaction.process(payload);
+      result = transaction.init(header, details);
     } catch (Exception ex) {
       try {
         transaction.abort();
@@ -91,9 +68,57 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
       throw Throwables.throwSneaky(ex);
     }
 
-    switch (returnValue.getResult()) {
+    switch (result) {
       case CONTINUE:
-        break;
+        long transactionid = store(transaction);
+        return new TransactionProcessor.InitializationResultImpl(transactionid, result, details.o);
+
+      case ABORT:
+        try {
+          transaction.abort();
+        } catch (Exception ex) {
+          throw Throwables.throwSneaky(ex);
+        }
+
+        return details.set ? new TransactionProcessor.InitializationResultImpl(0, Transaction.Result.ABORT, details.o) :
+               InitializationResult.ABORTED;
+
+      case COMMIT:
+        try {
+          transaction.commit();
+        } catch (Exception ex) {
+          throw Throwables.throwSneaky(ex);
+        }
+
+        return details.set ? new TransactionProcessor.InitializationResultImpl(0, Transaction.Result.COMMIT, details.o) :
+        InitializationResult.COMMITTED;
+    }
+
+    throw Throwables.throwFormatted(RuntimeException::new, "Unreachable Statement with result = {}!", result);
+  }
+
+  @Override
+  public ProcessResult process(long transactionId, Object payload) {
+    @SuppressWarnings("rawtypes")
+    Transaction transaction = retrieve(transactionId);
+
+    final DetailsConsumer details = new DetailsConsumer();
+    final Transaction.Result result;
+    try {
+      result = transaction.process(payload, details);
+    } catch (Exception ex) {
+      try {
+        transaction.abort();
+      } catch (Exception ex1) {
+        ex.addSuppressed(ex1);
+      }
+
+      throw Throwables.throwSneaky(ex);
+    }
+
+    switch (result) {
+      case CONTINUE:
+        return new ProcessResultImpl(Transaction.Result.CONTINUE, details.o);
 
       case ABORT:
         try {
@@ -103,7 +128,7 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
         } finally {
           remove(transactionId);
         }
-        break;
+        return details.set ? new ProcessResultImpl(Transaction.Result.ABORT, details.o) : ProcessResult.ABORTED;
 
       case COMMIT:
         try {
@@ -113,9 +138,9 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
         } finally {
           remove(transactionId);
         }
-        break;
+        return details.set ? new ProcessResultImpl(Transaction.Result.CONTINUE, details.o) : ProcessResult.COMMITTED;
     }
 
-    return returnValue;
+    throw Throwables.throwFormatted(RuntimeException::new, "Unreachable Statement with result = {}!", result);
   }
 }
