@@ -1,6 +1,7 @@
 package com.celeral.transaction.fileupload;
 
 import java.io.Closeable;
+import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -38,10 +39,23 @@ public class UploadPayloadIterator implements Iterator<UploadPayload>, Closeable
   @Override public UploadPayload next()
   {
     long nextOffset = offset + blockSize;
-    byte[] bytes = new byte[nextOffset < header.getSize() ? blockSize : (int)(header.getSize() - offset)];
+    int length = nextOffset < header.getSize() ? blockSize : (int)(header.getSize() - offset);
+    byte[] bytes = new byte[length];
     try {
-      is.read(bytes); // how many bytes read?
-      return new UploadPayload(offset, bytes);
+      int offset = 0;
+      int read = is.read(bytes);
+      if (read == -1) {
+        throw new EOFException();
+      }
+      while (read < length) {
+        length -= read;
+        offset += read;
+        read = is.read(bytes, offset, length);
+        if (read == -1) {
+          throw new EOFException();
+        }
+      }
+      return new UploadPayload(this.offset, bytes);
     }
     catch (IOException ex) {
       throw Throwables.throwFormatted(ex,
@@ -54,7 +68,6 @@ public class UploadPayloadIterator implements Iterator<UploadPayload>, Closeable
       offset = nextOffset;
     }
   }
-
   @Override public void remove()
   {
     throw new UnsupportedOperationException();

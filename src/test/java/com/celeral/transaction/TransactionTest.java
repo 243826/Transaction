@@ -6,6 +6,10 @@ import java.io.IOException;
 import org.junit.Assert;
 import org.junit.Test;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import com.celeral.transaction.fileupload.UploadPayload;
 import com.celeral.transaction.fileupload.UploadPayloadIterator;
 import com.celeral.transaction.fileupload.UploadTransaction;
 import com.celeral.transaction.fileupload.UploadTransactionHeader;
@@ -28,7 +32,7 @@ public class TransactionTest
   {
     return new UploadTransactionHeader("target/classes/" + UploadTransaction.class.getCanonicalName().replace('.',
                                                                                                               '/') +
-                                       ".class", 1024);
+                                       ".class");
   }
 
   public UploadPayloadIterator getPayloadIterator(UploadTransactionHeader header)
@@ -51,12 +55,13 @@ public class TransactionTest
 
       TransactionProcessor.ProcessResult process = null;
       while (iterator.hasNext()) {
-        process = processor.process(init.getTransactionId(), iterator.next());
-        Assert.assertTrue("Never Aborted!", process.getResult() != Transaction.Result.ABORT);
+        final UploadPayload next = iterator.next();
+        process = processor.process(init.getTransactionId(), next);
+        Assert.assertNotEquals("Never Aborted!", Transaction.Result.ABORT, process.getResult());
       }
 
       Assert.assertNotNull("Process invoked!", process);
-      Assert.assertTrue("Process Committed!", process.getResult() == Transaction.Result.COMMIT);
+      Assert.assertEquals("Process Committed!", Transaction.Result.COMMIT, process.getResult());
     }
   }
 
@@ -84,4 +89,5 @@ public class TransactionTest
 
   }
 
+  public static final Logger logger = LogManager.getLogger(TransactionTest.class);
 }

@@ -21,7 +21,8 @@ public interface Transaction<H, P> {
   enum Result {
     CONTINUE,
     COMMIT,
-    ABORT
+    ABORT,
+    SKIP
   }
 
   /**

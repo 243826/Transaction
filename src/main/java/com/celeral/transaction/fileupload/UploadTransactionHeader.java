@@ -2,16 +2,11 @@ package com.celeral.transaction.fileupload;
 
 import java.io.File;
 
-import com.esotericsoftware.kryo.serializers.FieldSerializer;
-import com.esotericsoftware.kryo.serializers.JavaSerializer;
-
 import static com.celeral.utils.Throwables.throwFormatted;
 
 public class UploadTransactionHeader
 {
-  @FieldSerializer.Bind(JavaSerializer.class)
-  private final File path;
-
+  private final String path;
   private final long size;
   private final long mtime;
 
@@ -22,33 +17,34 @@ public class UploadTransactionHeader
     mtime = 0;
   }
 
-  public UploadTransactionHeader(String path, int chunkSize)
+  public UploadTransactionHeader(String path)
   {
-    this.path = new File(path);
+    this.path = path;
 
-    if (this.getPath().exists()) {
-      if (this.getPath().isFile()) {
-        if (this.getPath().canRead()) {
-          this.size = this.getPath().length();
-          this.mtime = this.getPath().lastModified();
+    File file = new File(path);
+    if (file.exists()) {
+      if (file.isFile()) {
+        if (file.canRead()) {
+          this.size = file.length();
+          this.mtime = file.lastModified();
         }
         else {
           throw throwFormatted(IllegalArgumentException.class,
-                               "Unable to read file {} to create fileupload transaction!", this.getPath());
+                               "Unable to read file {} to create fileupload transaction!", file);
         }
       }
       else {
         throw throwFormatted(IllegalArgumentException.class,
-                             "Unable to create fileupload transaction with non-regular file {}!", this.getPath());
+                             "Unable to create fileupload transaction with non-regular file {}!", file);
       }
     }
     else {
       throw throwFormatted(IllegalArgumentException.class,
-                           "Unable to create fileupload transaction with non existent file {}!", this.getPath());
+                           "Unable to create fileupload transaction with non existent file {}!", file);
     }
   }
 
-  public File getPath()
+  public String getPath()
   {
     return path;
   }

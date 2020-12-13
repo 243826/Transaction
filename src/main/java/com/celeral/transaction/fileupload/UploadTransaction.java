@@ -31,7 +31,7 @@ import static com.celeral.transaction.Transaction.Result.CONTINUE;
 
 public class UploadTransaction implements Transaction<UploadTransactionHeader, UploadPayload> {
 
-  private final File root;
+  protected final File root;
   private RandomAccessFile channel;
   private File tempFile;
   private long size;
@@ -44,12 +44,14 @@ public class UploadTransaction implements Transaction<UploadTransactionHeader, U
   @Override
   public Result init(UploadTransactionHeader header, Consumer<Object> details) throws IOException {
     size = header.getSize();
-    path = header.getPath().getName();
+    path = header.getPath();
 
-    tempFile = File.createTempFile(path, null, root);
+    File file = new File(header.getPath());
+    String filename = file.getName();
+
+    tempFile = File.createTempFile(filename, null, root);
     channel = new RandomAccessFile(tempFile, "rw");
-
-    return header.getSize() == 0 ? COMMIT : CONTINUE;
+    return size == 0 ? COMMIT : CONTINUE;
   }
 
   @Override
@@ -72,9 +74,12 @@ public class UploadTransaction implements Transaction<UploadTransactionHeader, U
   public void commit() throws IOException {
     channel.close();
 
-    File dpath = new File(root, path);
-    tempFile.renameTo(dpath);
-    logger.debug("Creating file {}", dpath);
+    File destination = new File(root, path);
+    if (!destination.getParentFile().exists()) {
+      destination.getParentFile().mkdirs();
+    }
+    tempFile.renameTo(destination);
+    logger.debug("Creating file {}", destination);
   }
 
   private static final Logger logger = LogManager.getLogger(UploadTransaction.class);
