@@ -91,6 +91,10 @@ public interface TransactionProcessor {
     private final Transaction.Result result;
     private final Object details;
 
+    private ProcessResultImpl() {
+      this(null, null);
+    }
+
     public ProcessResultImpl(Transaction.Result result, Object details) {
       this.result = result;
       this.details = details;
@@ -107,6 +111,10 @@ public interface TransactionProcessor {
 
   class InitializationResultImpl extends ProcessResultImpl implements InitializationResult {
     long transactionId;
+
+    private InitializationResultImpl() {
+    }
+
     public InitializationResultImpl(long transactionId, Transaction.Result result, Object details)
     {
       super(result, details);

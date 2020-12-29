@@ -1,7 +1,9 @@
 package com.celeral.transaction;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -17,13 +19,46 @@ import com.celeral.transaction.processor.AbstractSerialTransactionProcessor;
 
 public class TransactionTest
 {
+  static class FileUploadTransaction extends UploadTransaction<FileUploadTransaction> implements UploadTransaction.Document {
+    File root;
+    File tempFile;
+
+    public FileUploadTransaction(File root) {
+      this.root = root;
+    }
+
+    @Override public FileUploadTransaction createTemporaryDocument(String path) throws IOException
+    {
+      tempFile = File.createTempFile(new File(path).getName(), null, root);
+      return this;
+    }
+
+    @Override public OutputStream openOutputStream() throws IOException
+    {
+      return new FileOutputStream(tempFile);
+    }
+
+    @Override public boolean delete() throws IOException
+    {
+      return tempFile.delete();
+    }
+
+    @Override public boolean renameTo(String path) throws IOException
+    {
+      File destination = new File(root, path);
+          if (!destination.getParentFile().exists()) {
+            destination.getParentFile().mkdirs();
+          }
+          return tempFile.renameTo(destination);
+    }
+  }
 
   static class SerialTransactionProcessor extends AbstractSerialTransactionProcessor
   {
     @Override public Transaction<?, ?> newTransaction()
     {
       String tmpdir = System.getProperty("java.io.tmpdir");
-      return new UploadTransaction(new File(tmpdir));
+      return new FileUploadTransaction(new File(tmpdir));
     }
   }
 

@@ -16,9 +16,8 @@
 package com.celeral.transaction.fileupload;
 
 import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.OutputStream;
 import java.util.function.Consumer;
 
 import org.apache.logging.log4j.LogManager;
@@ -29,34 +28,44 @@ import com.celeral.transaction.Transaction;
 import static com.celeral.transaction.Transaction.Result.COMMIT;
 import static com.celeral.transaction.Transaction.Result.CONTINUE;
 
-public class UploadTransaction implements Transaction<UploadTransactionHeader, UploadPayload> {
+public abstract class UploadTransaction<D extends UploadTransaction.Document> implements Transaction<UploadTransactionHeader,
+                                                                                       UploadPayload> {
 
-  protected final File root;
-  private RandomAccessFile channel;
-  private File tempFile;
+  public interface Document {
+
+    OutputStream openOutputStream() throws IOException;
+
+    boolean delete() throws IOException;
+
+    boolean renameTo(String path) throws IOException;
+  }
+
+  private OutputStream channel;
+  private D tempFile;
   private long size;
   private String path;
+  Closeable aborter = () -> {};
 
-  public UploadTransaction(File root) {
-    this.root = root;
-  }
+  public abstract D createTemporaryDocument(String path) throws IOException;
 
   @Override
   public Result init(UploadTransactionHeader header, Consumer<Object> details) throws IOException {
     size = header.getSize();
     path = header.getPath();
 
-    File file = new File(header.getPath());
-    String filename = file.getName();
-
-    tempFile = File.createTempFile(filename, null, root);
-    channel = new RandomAccessFile(tempFile, "rw");
+    tempFile = createTemporaryDocument(path);
+    try {
+      channel = tempFile.openOutputStream();
+      aborter = () -> { try (Closeable unused = tempFile::delete) {channel.close();}};
+    }
+    catch (Throwable th) {
+      aborter = () -> channel.close();
+    }
     return size == 0 ? COMMIT : CONTINUE;
   }
 
   @Override
   public Result process(UploadPayload payload, Consumer<Object> details) throws IOException {
-    channel.seek(payload.offset);
     channel.write(payload.data);
 
     return payload.offset + payload.data.length == size ? COMMIT : CONTINUE;
@@ -65,21 +74,13 @@ public class UploadTransaction implements Transaction<UploadTransactionHeader, U
   @Override
   public void abort() throws IOException {
     logger.debug("Deleting file {}", tempFile);
-
-    try (Closeable unused = tempFile::delete) {
-      channel.close();
-    }
+    aborter.close();
   }
 
   public void commit() throws IOException {
     channel.close();
-
-    File destination = new File(root, path);
-    if (!destination.getParentFile().exists()) {
-      destination.getParentFile().mkdirs();
-    }
-    tempFile.renameTo(destination);
-    logger.debug("Creating file {}", destination);
+    tempFile.renameTo(path);
+    logger.debug("Creating file {}", path);
   }
 
   private static final Logger logger = LogManager.getLogger(UploadTransaction.class);
