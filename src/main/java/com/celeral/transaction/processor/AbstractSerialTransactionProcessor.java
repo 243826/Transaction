@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Celeral.
+ * Copyright © 2021 Celeral.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,21 +18,21 @@ package com.celeral.transaction.processor;
 import com.celeral.transaction.Transaction;
 
 public abstract class AbstractSerialTransactionProcessor extends AbstractTransactionProcessor {
-  Transaction<?,?> currentTransaction;
+  Transaction<?, ?> currentTransaction;
 
   @Override
-  public long store(Transaction<?,?> transaction) {
+  public long store(Transaction<?, ?> transaction) {
     currentTransaction = transaction;
     return getNextTransactionId();
   }
 
   @Override
-  public Transaction<?,?> retrieve(long transactionId) {
+  public Transaction<?, ?> retrieve(long transactionId) {
     return currentTransaction;
   }
 
   @Override
-  public Transaction<?,?> remove(long transactionId) {
+  public Transaction<?, ?> remove(long transactionId) {
     try {
       return currentTransaction;
     } finally {

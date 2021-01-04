@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Celeral.
+ * Copyright © 2021 Celeral.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,10 @@ package com.celeral.transaction.processor;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
+import com.celeral.utils.Throwables;
+
 import com.celeral.transaction.Transaction;
 import com.celeral.transaction.TransactionProcessor;
-import com.celeral.utils.Throwables;
 
 public abstract class AbstractTransactionProcessor implements TransactionProcessor {
 
@@ -30,8 +31,8 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
     Object o;
     boolean set;
 
-    @Override public void accept(Object o)
-    {
+    @Override
+    public void accept(Object o) {
       set = true;
       this.o = o;
     }
@@ -41,13 +42,13 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
     return TRANSACTION_ID_GENERATOR.incrementAndGet();
   }
 
-  public abstract long store(Transaction<?,?> transaction);
+  public abstract long store(Transaction<?, ?> transaction);
 
-  public abstract Transaction<?,?> retrieve(long transactionId);
+  public abstract Transaction<?, ?> retrieve(long transactionId);
 
-  public abstract Transaction<?,?> remove(long transactionId);
+  public abstract Transaction<?, ?> remove(long transactionId);
 
-  public abstract Transaction<?,?> newTransaction();
+  public abstract Transaction<?, ?> newTransaction();
 
   @Override
   public InitializationResult init(Object header) {
@@ -80,8 +81,10 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
           throw Throwables.throwSneaky(ex);
         }
 
-        return details.set ? new TransactionProcessor.InitializationResultImpl(0, Transaction.Result.ABORT, details.o) :
-               InitializationResult.ABORTED;
+        return details.set
+            ? new TransactionProcessor.InitializationResultImpl(
+                0, Transaction.Result.ABORT, details.o)
+            : InitializationResult.ABORTED;
 
       case COMMIT:
         try {
@@ -90,11 +93,17 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
           throw Throwables.throwSneaky(ex);
         }
 
-        return details.set ? new TransactionProcessor.InitializationResultImpl(0, Transaction.Result.COMMIT, details.o) :
-        InitializationResult.COMMITTED;
+        return details.set
+            ? new TransactionProcessor.InitializationResultImpl(
+                0, Transaction.Result.COMMIT, details.o)
+            : InitializationResult.COMMITTED;
+
+      case SKIP:
+        return InitializationResult.SKIP;
     }
 
-    throw Throwables.throwFormatted(RuntimeException::new, "Unreachable Statement with result = {}!", result);
+    throw Throwables.throwFormatted(
+        RuntimeException::new, "Unreachable Statement with result = {}!", result);
   }
 
   @Override
@@ -128,7 +137,9 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
         } finally {
           remove(transactionId);
         }
-        return details.set ? new ProcessResultImpl(Transaction.Result.ABORT, details.o) : ProcessResult.ABORTED;
+        return details.set
+            ? new ProcessResultImpl(Transaction.Result.ABORT, details.o)
+            : ProcessResult.ABORTED;
 
       case COMMIT:
         try {
@@ -138,9 +149,15 @@ public abstract class AbstractTransactionProcessor implements TransactionProcess
         } finally {
           remove(transactionId);
         }
-        return details.set ? new ProcessResultImpl(Transaction.Result.CONTINUE, details.o) : ProcessResult.COMMITTED;
+        return details.set
+            ? new ProcessResultImpl(Transaction.Result.CONTINUE, details.o)
+            : ProcessResult.COMMITTED;
+
+      case SKIP:
+        return ProcessResult.SKIP;
     }
 
-    throw Throwables.throwFormatted(RuntimeException::new, "Unreachable Statement with result = {}!", result);
+    throw Throwables.throwFormatted(
+        RuntimeException::new, "Unreachable Statement with result = {}!", result);
   }
 }

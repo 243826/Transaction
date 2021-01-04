@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Celeral.
+ * Copyright © 2021 Celeral.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,9 @@
  */
 package com.celeral.transaction.fileupload;
 
+import static com.celeral.transaction.Transaction.Result.COMMIT;
+import static com.celeral.transaction.Transaction.Result.CONTINUE;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -25,11 +28,8 @@ import org.apache.logging.log4j.Logger;
 
 import com.celeral.transaction.Transaction;
 
-import static com.celeral.transaction.Transaction.Result.COMMIT;
-import static com.celeral.transaction.Transaction.Result.CONTINUE;
-
-public abstract class UploadTransaction<D extends UploadTransaction.Document> implements Transaction<UploadTransactionHeader,
-                                                                                       UploadPayload> {
+public abstract class UploadTransaction<D extends UploadTransaction.Document>
+    implements Transaction<UploadTransactionHeader, UploadPayload> {
 
   public interface Document {
 
@@ -56,9 +56,13 @@ public abstract class UploadTransaction<D extends UploadTransaction.Document> im
     tempFile = createTemporaryDocument(path);
     try {
       channel = tempFile.openOutputStream();
-      aborter = () -> { try (Closeable unused = tempFile::delete) {channel.close();}};
-    }
-    catch (Throwable th) {
+      aborter =
+          () -> {
+            try (Closeable unused = tempFile::delete) {
+              channel.close();
+            }
+          };
+    } catch (Throwable th) {
       aborter = () -> channel.close();
     }
     return size == 0 ? COMMIT : CONTINUE;

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 Celeral.
+ * Copyright © 2021 Celeral.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,73 +19,106 @@ public interface TransactionProcessor {
 
   interface ProcessResult {
     Transaction.Result getResult();
+
     Object getDetails();
 
-    ProcessResult ABORTED = new ProcessResult() {
-      @Override public Transaction.Result getResult()
-      {
-        return Transaction.Result.ABORT;
-      }
+    ProcessResult ABORTED =
+        new ProcessResult() {
+          @Override
+          public Transaction.Result getResult() {
+            return Transaction.Result.ABORT;
+          }
 
-      @Override public Object getDetails()
-      {
-        return null;
-      }
-    };
+          @Override
+          public Object getDetails() {
+            return null;
+          }
+        };
 
-    ProcessResult COMMITTED = new ProcessResult() {
-      @Override public Transaction.Result getResult()
-      {
-        return Transaction.Result.COMMIT;
-      }
+    ProcessResult COMMITTED =
+        new ProcessResult() {
+          @Override
+          public Transaction.Result getResult() {
+            return Transaction.Result.COMMIT;
+          }
 
-      @Override public Object getDetails()
-      {
-        return null;
-      }
-    };
+          @Override
+          public Object getDetails() {
+            return null;
+          }
+        };
+
+    ProcessResult SKIP =
+        new ProcessResult() {
+          @Override
+          public Transaction.Result getResult() {
+            return Transaction.Result.SKIP;
+          }
+
+          @Override
+          public Object getDetails() {
+            return null;
+          }
+        };
   }
 
   interface InitializationResult extends ProcessResult {
     long getTransactionId();
 
-    InitializationResult ABORTED = new InitializationResult() {
-      @Override public long getTransactionId()
-      {
-        return 0;
-      }
+    InitializationResult ABORTED =
+        new InitializationResult() {
+          @Override
+          public long getTransactionId() {
+            return 0;
+          }
 
-      @Override public Transaction.Result getResult()
-      {
-        return Transaction.Result.ABORT;
-      }
+          @Override
+          public Transaction.Result getResult() {
+            return Transaction.Result.ABORT;
+          }
 
-      @Override public Object getDetails()
-      {
-        return null;
-      }
-    };
+          @Override
+          public Object getDetails() {
+            return null;
+          }
+        };
 
+    InitializationResult COMMITTED =
+        new InitializationResult() {
+          @Override
+          public long getTransactionId() {
+            return 0;
+          }
 
-    InitializationResult COMMITTED = new InitializationResult() {
-      @Override public long getTransactionId()
-      {
-        return 0;
-      }
+          @Override
+          public Transaction.Result getResult() {
+            return Transaction.Result.COMMIT;
+          }
 
-      @Override public Transaction.Result getResult()
-      {
-        return Transaction.Result.COMMIT;
-      }
+          @Override
+          public Object getDetails() {
+            return null;
+          }
+        };
 
-      @Override public Object getDetails()
-      {
-        return null;
-      }
-    };
+    InitializationResult SKIP =
+        new InitializationResult() {
+          @Override
+          public long getTransactionId() {
+            return 0;
+          }
+
+          @Override
+          public Transaction.Result getResult() {
+            return Transaction.Result.SKIP;
+          }
+
+          @Override
+          public Object getDetails() {
+            return null;
+          }
+        };
   }
-
-
 
   class ProcessResultImpl implements ProcessResult {
     private final Transaction.Result result;
@@ -112,11 +145,9 @@ public interface TransactionProcessor {
   class InitializationResultImpl extends ProcessResultImpl implements InitializationResult {
     long transactionId;
 
-    private InitializationResultImpl() {
-    }
+    private InitializationResultImpl() {}
 
-    public InitializationResultImpl(long transactionId, Transaction.Result result, Object details)
-    {
+    public InitializationResultImpl(long transactionId, Transaction.Result result, Object details) {
       super(result, details);
       this.transactionId = transactionId;
     }
@@ -124,9 +155,7 @@ public interface TransactionProcessor {
     public long getTransactionId() {
       return transactionId;
     }
-
   }
-
 
   InitializationResult init(Object header);
 
